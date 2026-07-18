@@ -44,7 +44,32 @@ function Message({ message }: { message: AssistantMessage }) {
         {assistant ? (
           <div className="surface-card">
             <p className="eyebrow flex items-center gap-2"><Sparkles size={13} />AI-generated explanation</p>
-            <p className="mt-3 text-[15px] leading-7 text-slate-700 dark:text-slate-200">{message.content}</p>
+            <p className="mt-3 whitespace-pre-wrap text-[15px] leading-7 text-slate-700 dark:text-slate-200">{message.content}</p>
+            {message.toolCalls && message.toolCalls.length > 0 && (
+              <section className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60" aria-label="Tools used">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tools used</p>
+                <ul className="mt-2 space-y-1.5">
+                  {message.toolCalls.map((call, index) => (
+                    <li key={`${call.name}-${index}`} className="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 font-medium ${call.ok ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" : "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200"}`}>
+                        {call.ok ? "ok" : "failed"}
+                      </span>
+                      <code className="rounded bg-white px-1.5 py-0.5 font-mono text-[11px] dark:bg-slate-950">{call.name}</code>
+                      {Object.keys(call.arguments ?? {}).length > 0 && (
+                        <span className="truncate text-slate-500" title={JSON.stringify(call.arguments)}>
+                          {JSON.stringify(call.arguments)}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {(message.model || message.provider) && (
+                  <p className="mt-2 text-[11px] text-slate-400">
+                    {[message.provider, message.model].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+              </section>
+            )}
             <EvidenceList evidence={message.evidence ?? []} />
             {message.proposalIds && message.proposalIds.length > 0 && (
               <section className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900 dark:bg-indigo-950/40" aria-label="Proposed actions">
