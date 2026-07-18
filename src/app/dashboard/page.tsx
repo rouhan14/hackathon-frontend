@@ -15,13 +15,7 @@ export default function DashboardPage() {
         </header>
 
         <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-6 py-16">
-          <div className="flex flex-col gap-3">
-            <UserGreeting />
-            <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-              This is your landing page. Everything below is placeholder content
-              to show you made it past the login screen.
-            </p>
-          </div>
+          <UserGreeting />
 
           <section className="flex flex-col gap-4">
             <h2 className="text-xl font-semibold tracking-tight text-black dark:text-zinc-50">

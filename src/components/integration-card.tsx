@@ -88,8 +88,8 @@ export default function IntegrationCard({
         aria-live="polite"
         className={
           connected
-            ? "h-10 rounded-full border border-red-600/30 bg-red-600/10 px-4 text-sm font-medium text-red-600 transition-colors hover:bg-red-600/20 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400"
-            : "h-10 rounded-full bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-[#ccc]"
+            ? "h-10 rounded-full border border-red-600/30 bg-red-600/10 px-4 text-sm font-medium text-red-600 transition-colors hover:bg-red-600/20 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 cursor-pointer"
+            : "h-10 rounded-full bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-[#ccc] cursor-pointer"
         }
       >
         {label}

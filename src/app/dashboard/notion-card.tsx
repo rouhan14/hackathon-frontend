@@ -13,7 +13,7 @@ export default function NotionCard() {
   // Reactively read the cached user (refreshed from /auth/me by UserGreeting).
   const user = useSyncExternalStore(subscribeToken, getUser, () => null);
   const notion = user?.integrations?.find(
-    (integration) => integration.provider === "notion"
+    (integration) => integration.provider === "NOTION"
   );
 
   return (

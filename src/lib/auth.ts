@@ -147,12 +147,14 @@ export async function disconnectIntegration(
  * send an Authorization header. Adjust the param name here if the backend
  * expects the token differently.
  */
-export function startNotionOAuth(): void {
-  if (typeof window === "undefined") return;
-  const url = new URL(`${API_BASE_URL}/auth/notion`);
-  const token = getToken();
-  if (token) url.searchParams.set("token", token);
-  window.location.href = url.toString();
+export async function startNotionOAuth(): Promise<void> {
+  const { authorizationUrl } = await request<{ authorizationUrl: string }>(
+    "/auth/notion",
+    { method: "GET" },
+    { authenticated: true }
+  );
+
+  window.location.href = authorizationUrl;
 }
 
 /** Reads the JWT out of a response, tolerating a few common field names. */
