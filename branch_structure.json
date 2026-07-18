@@ -1,0 +1,30 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "codex/live-assistant",
+    "feat/unified-brain-assistant",
+    "feature/notion",
+    "feature/notion-mcp-conn",
+    "main",
+    "merge/clickup",
+    "origin"
+  ],
+  "parent": {
+    "codex/live-assistant": "main",
+    "feat/unified-brain-assistant": "main",
+    "feature/notion": "main",
+    "feature/notion-mcp-conn": "feature/notion",
+    "main": null,
+    "merge/clickup": "main",
+    "origin": "main"
+  },
+  "order": [
+    "main",
+    "codex/live-assistant",
+    "feat/unified-brain-assistant",
+    "feature/notion",
+    "merge/clickup",
+    "origin",
+    "feature/notion-mcp-conn"
+  ]
+}

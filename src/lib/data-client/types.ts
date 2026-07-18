@@ -132,6 +132,12 @@ export interface WorkFilters {
   due?: "all" | "today" | "overdue" | "upcoming";
 }
 
+export interface AssistantToolCallTrace {
+  name: string;
+  arguments: Record<string, unknown>;
+  ok: boolean;
+}
+
 export interface AssistantMessage {
   id: string;
   role: "user" | "assistant";
@@ -139,6 +145,10 @@ export interface AssistantMessage {
   createdAt: string;
   evidence?: Evidence[];
   proposalIds?: string[];
+  /** Tools the backend executed while answering (live mode). */
+  toolCalls?: AssistantToolCallTrace[];
+  model?: string;
+  provider?: string;
 }
 
 export interface AssistantThread {

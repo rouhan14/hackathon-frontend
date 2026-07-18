@@ -1,9 +1,26 @@
-import { disconnectIntegration, fetchMe, getUser, startNotionOAuth } from "@/lib/auth";
+import {
+  disconnectIntegration,
+  fetchMe,
+  getUser,
+  request,
+  startNotionOAuth,
+} from "@/lib/auth";
 import {
   connectJira,
   listIntegrations as listBackendIntegrations,
 } from "@/lib/integrations";
+import {
+  formatNestErrorBody,
+  mergeAskIntoThread,
+  type BackendAssistantAskResponse,
+} from "./assistant-ask";
+import {
+  getStoredThread,
+  listStoredThreads,
+} from "./assistant-thread-store";
 import type {
+  AskInput,
+  ClientRequestOptions,
   Integration,
   IntegrationStatus,
   Source,
@@ -42,6 +59,32 @@ export function normalizeIntegrationStatus(status: string): IntegrationStatus {
     default:
       return "error";
   }
+}
+
+function mapAskHttpError(error: unknown): never {
+  if (error instanceof WorkOsClientError) throw error;
+  const message =
+    error instanceof Error ? error.message : "The assistant could not answer.";
+
+  if (/Unable to reach the server/i.test(message)) {
+    throw new WorkOsClientError("backend-unavailable", message, true);
+  }
+  // Model / Bedrock credential problems are server config, not app logout.
+  if (
+    /BEDROCK|model provider|MODEL_AUTH_FAILED|MODEL_NOT_AVAILABLE|MODEL_UPSTREAM/i.test(
+      message,
+    )
+  ) {
+    throw new WorkOsClientError("backend-unavailable", message, true);
+  }
+  if (
+    /Access token has expired|Invalid access token|Authentication token is missing|Unauthorized\./i.test(
+      message,
+    )
+  ) {
+    throw new WorkOsClientError("reauth-required", message);
+  }
+  throw new WorkOsClientError("unexpected", message, true);
 }
 
 export const httpWorkOsClient: WorkOsClient = {
@@ -86,13 +129,57 @@ export const httpWorkOsClient: WorkOsClient = {
     return unavailable("Work-item details");
   },
   async listThreads() {
-    return unavailable("Conversation history");
+    // Backend does not persist conversation history yet — use local store filled by ask.
+    return listStoredThreads();
   },
-  async getThread() {
-    return unavailable("Conversation history");
+  async getThread(id) {
+    const thread = getStoredThread(id);
+    if (!thread) {
+      throw new WorkOsClientError("unexpected", "Conversation not found.");
+    }
+    return thread;
   },
-  async askAssistant() {
-    return unavailable("The workplace assistant");
+  async askAssistant(input: AskInput, options?: ClientRequestOptions) {
+    try {
+      const backend = await request<BackendAssistantAskResponse>(
+        "/assistant/ask",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: input.prompt }),
+          signal: options?.signal,
+        },
+        { authenticated: true },
+      );
+
+      if (!backend || typeof backend.answer !== "string") {
+        throw new WorkOsClientError(
+          "unexpected",
+          "The assistant returned an unexpected response shape.",
+        );
+      }
+
+      return mergeAskIntoThread(input, {
+        ...backend,
+        toolCalls: Array.isArray(backend.toolCalls) ? backend.toolCalls : [],
+      });
+    } catch (error) {
+      if (options?.signal?.aborted) throw error;
+      // request() already throws Error with a message; normalize Nest-ish bodies if present
+      if (error instanceof Error && error.message.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(error.message) as unknown;
+          throw new WorkOsClientError(
+            "unexpected",
+            formatNestErrorBody(parsed, 500),
+            true,
+          );
+        } catch (inner) {
+          if (inner instanceof WorkOsClientError) throw inner;
+        }
+      }
+      mapAskHttpError(error);
+    }
   },
   async listApprovals() {
     return unavailable("Approval proposals");

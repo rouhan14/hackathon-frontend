@@ -1,20 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Work OS Frontend
+
+Next.js app for auth, integrations, and the workplace assistant.
 
 ## Getting Started
 
-First, run the development server:
+1. Copy env and point at the Nest API (live mode by default when `NEXT_PUBLIC_DATA_MODE` is not `mock`):
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
+# NEXT_PUBLIC_API_BASE_URL=http://localhost:5000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Start the backend (`hackathon-backend`) on port 5000 with valid `BEDROCK_*` and provider OAuth env.
+
+3. Start the frontend:
+
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Live assistant flow
+
+1. Sign up / log in.
+2. Connect Jira under **Integrations** (`GET /auth/jira`).
+3. Open **Assistant** and ask e.g. “What open Jira issues am I assigned to?”
+4. The UI calls `POST /assistant/ask`; tool traces (e.g. `jira_search`) show under the answer.
+5. Conversation history is stored in the browser until the backend adds durable threads.
+
+### Mock mode
+
+Set `NEXT_PUBLIC_DATA_MODE=mock` in `.env.local` for a full offline demo without the API.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

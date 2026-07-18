@@ -85,15 +85,46 @@ export async function request<T>(
   }
 
   if (!res.ok) {
-    const message =
-      (data as { message?: string; error?: string } | null)?.message ??
-      (data as { error?: string } | null)?.error ??
-      `Request failed (${res.status}).`;
+    const body = data as {
+      message?: string | string[] | { message?: string; code?: string };
+      error?: string;
+      code?: string;
+    } | null;
 
-    // A 401 on an authenticated call = the session is no longer valid
-    // (missing / expired / malformed / bad signature). End it and remember the
-    // server's reason so the login page can explain why the user was signed out.
-    if (res.status === 401 && authenticated) {
+    let message: string;
+    if (typeof body?.message === "string") {
+      message = body.message;
+    } else if (Array.isArray(body?.message)) {
+      message = body.message.join(" ");
+    } else if (body?.message && typeof body.message === "object") {
+      message =
+        typeof body.message.message === "string"
+          ? body.message.message
+          : `Request failed (${res.status}).`;
+    } else if (typeof body?.error === "string") {
+      message = body.error;
+    } else {
+      message = `Request failed (${res.status}).`;
+    }
+
+    let code: string | undefined =
+      typeof body?.code === "string" ? body.code : undefined;
+    if (
+      !code &&
+      body?.message &&
+      typeof body.message === "object" &&
+      !Array.isArray(body.message) &&
+      typeof body.message.code === "string"
+    ) {
+      code = body.message.code;
+    }
+    if (code && !message.includes(code)) {
+      message = `${message} (${code})`;
+    }
+
+    // Only clear the app session when this 401 is about the *user JWT*, not
+    // upstream providers (Bedrock, Jira reauth codes, etc.).
+    if (res.status === 401 && authenticated && isAppSessionUnauthorized(code, message)) {
       setAuthNotice(message);
       clearToken();
     }
@@ -110,6 +141,33 @@ function postJson<T>(path: string, body: unknown): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+/**
+ * True when a 401 means the browser JWT is invalid/expired.
+ * False for upstream failures that also use 401 (legacy model auth, Jira reauth).
+ */
+export function isAppSessionUnauthorized(
+  code: string | undefined,
+  message: string,
+): boolean {
+  if (
+    code === "MODEL_AUTH_FAILED" ||
+    code === "MODEL_NOT_AVAILABLE" ||
+    code === "MODEL_UPSTREAM_ERROR" ||
+    code === "JIRA_REAUTH_REQUIRED" ||
+    code === "JIRA_SEARCH_PERMISSION_REQUIRED"
+  ) {
+    return false;
+  }
+  if (/model provider|bedrock|BEDROCK_|mantle/i.test(message)) {
+    return false;
+  }
+  if (/jira connection must be authorized again/i.test(message)) {
+    return false;
+  }
+  // Default: authenticated-route 401 → treat as session loss (Nest JWT guard).
+  return true;
 }
 
 /** Fetches the current user from GET /auth/me and refreshes the cached user. */
