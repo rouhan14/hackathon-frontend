@@ -4,11 +4,17 @@ const API_BASE_URL =
 const TOKEN_KEY = "auth_token";
 const USER_KEY = "auth_user";
 
+/** Integration row as returned on the user object (e.g. GET /auth/me). */
 export type Integration = {
   id: string;
   provider: string;
-  workspaceId?: string;
-  workspaceName?: string;
+  accountId?: string;
+  accountName?: string | null;
+  workspaceId?: string | null;
+  workspaceName?: string | null;
+  status?: string;
+  grantedScopes?: string[];
+  lastSuccessfulSyncAt?: string | null;
   botId?: string;
   createdAt: string;
   updatedAt: string;
@@ -59,7 +65,7 @@ type RequestOptions = {
 };
 
 /** Runs a request and parses the JSON body, throwing a readable error on failure. */
-async function request<T>(
+export async function request<T>(
   path: string,
   init: RequestInit,
   { authenticated = false }: RequestOptions = {}

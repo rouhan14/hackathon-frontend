@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowRight, ShieldCheck, Sparkles } from "lucide-react";
+import GuestGuard from "@/components/guest-guard";
 import {
-  login,
   getAuthNotice,
   getServerAuthNotice,
+  login,
   setAuthNotice,
   subscribeAuthNotice,
 } from "@/lib/auth";
-import GuestGuard from "@/components/guest-guard";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,35 +19,28 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  // Reason the previous session ended (e.g. expired token), if any.
   const notice = useSyncExternalStore(
     subscribeAuthNotice,
     getAuthNotice,
-    getServerAuthNotice
+    getServerAuthNotice,
   );
 
-  // Clear the notice when leaving the page so it only shows once.
-  useEffect(() => {
-    return () => setAuthNotice(null);
-  }, []);
+  useEffect(() => () => setAuthNotice(null), []);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (!email || !password) {
       setError("Please enter both email and password.");
       return;
     }
-
     setError("");
     setAuthNotice(null);
     setLoading(true);
     try {
       await login(email, password);
       router.push("/dashboard");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -54,87 +48,28 @@ export default function LoginPage() {
 
   return (
     <GuestGuard>
-    <div className="flex flex-1 items-center justify-center bg-zinc-50 px-4 py-16 dark:bg-black">
-      <div className="w-full max-w-sm rounded-2xl border border-black/[.08] bg-white p-8 shadow-sm dark:border-white/[.12] dark:bg-zinc-950">
-        <div className="mb-8 flex flex-col gap-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
-            Welcome back
-          </h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Sign in to continue to your dashboard.
-          </p>
-        </div>
-
-        {notice && (
-          <div
-            role="status"
-            className="mb-5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400"
-          >
-            {notice} Please sign in again.
+      <main className="grid min-h-screen bg-slate-50 dark:bg-slate-950 lg:grid-cols-[1.05fr_.95fr]">
+        <section className="relative hidden overflow-hidden bg-slate-950 p-12 text-white lg:flex lg:flex-col lg:justify-between">
+          <div className="absolute -right-40 -top-40 h-96 w-96 rounded-full bg-indigo-500/25 blur-3xl" />
+          <div className="relative flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-500"><Sparkles size={19} /></span><span className="text-lg font-semibold">AI Work OS</span></div>
+          <div className="relative max-w-xl"><p className="text-xs font-semibold uppercase tracking-[.18em] text-indigo-300">Your work, understood</p><h1 className="mt-5 text-4xl font-semibold leading-tight tracking-tight">One calm place to find priorities, evidence, and the next safe action.</h1><p className="mt-5 max-w-lg text-base leading-8 text-slate-300">Bring tasks, issues, documents, meetings, and follow-ups into a single source-aware workplace assistant.</p><div className="mt-8 flex items-center gap-2 text-sm text-slate-300"><ShieldCheck size={17} className="text-emerald-300" />External changes always require your approval.</div></div>
+          <p className="relative text-xs text-slate-500">AI Work OS · Frontend MVP</p>
+        </section>
+        <section className="flex items-center justify-center px-5 py-12 sm:px-10">
+          <div className="w-full max-w-md">
+            <Link href="/" className="mb-9 flex items-center gap-2 lg:hidden"><span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-600 text-white"><Sparkles size={17} /></span><span className="font-semibold">AI Work OS</span></Link>
+            <div className="mb-8"><p className="eyebrow">Welcome back</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">Sign in to your workspace</h1><p className="mt-2 text-sm leading-6 text-slate-500">Continue to today’s priorities, sources, and proposals.</p></div>
+            {notice && <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">{notice} Please sign in again.</div>}
+            <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
+              <label><span className="field-label">Email</span><input id="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" className="field-input h-12" /></label>
+              <label><span className="field-label">Password</span><input id="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" className="field-input h-12" /></label>
+              {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">{error}</p>}
+              <button type="submit" disabled={loading} className="button-primary mt-1 h-12 w-full">{loading ? "Signing in…" : <>Sign in <ArrowRight size={16} /></>}</button>
+            </form>
+            <p className="mt-7 text-center text-sm text-slate-500">Don&apos;t have an account? <Link href="/signup" className="font-semibold text-indigo-700 hover:text-indigo-600 dark:text-indigo-200">Sign up</Link></p>
           </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
-          <div className="flex flex-col gap-2">
-            <label
-              htmlFor="email"
-              className="text-sm font-medium text-zinc-800 dark:text-zinc-200"
-            >
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="h-11 rounded-lg border border-black/[.12] bg-transparent px-3 text-sm text-black outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-500 dark:border-white/[.16] dark:text-zinc-50"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label
-              htmlFor="password"
-              className="text-sm font-medium text-zinc-800 dark:text-zinc-200"
-            >
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="h-11 rounded-lg border border-black/[.12] bg-transparent px-3 text-sm text-black outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-500 dark:border-white/[.16] dark:text-zinc-50"
-            />
-          </div>
-
-          {error && (
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-1 h-11 rounded-full bg-foreground px-5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-[#ccc]"
-          >
-            {loading ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-500">
-          Don&apos;t have an account?{" "}
-          <Link
-            href="/signup"
-            className="font-medium text-zinc-900 dark:text-zinc-100"
-          >
-            Sign up
-          </Link>
-        </p>
-      </div>
-    </div>
+        </section>
+      </main>
     </GuestGuard>
   );
 }
