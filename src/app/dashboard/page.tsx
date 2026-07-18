@@ -2,6 +2,7 @@ import AuthGuard from "@/components/auth-guard";
 import SignOutButton from "./sign-out-button";
 import UserGreeting from "./user-greeting";
 import NotionCard from "./notion-card";
+import SlackCard from "./slack-card";
 
 export default function DashboardPage() {
   return (
@@ -23,6 +24,7 @@ export default function DashboardPage() {
             </h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <NotionCard />
+              <SlackCard />
             </div>
           </section>
         </main>

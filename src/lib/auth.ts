@@ -157,6 +157,17 @@ export async function startNotionOAuth(): Promise<void> {
   window.location.href = authorizationUrl;
 }
 
+/** Starts the Slack OAuth flow via authenticated GET /auth/slack. */
+export async function startSlackOAuth(): Promise<void> {
+  const { authorizationUrl } = await request<{ authorizationUrl: string }>(
+    "/auth/slack",
+    { method: "GET" },
+    { authenticated: true }
+  );
+
+  window.location.href = authorizationUrl;
+}
+
 /** Reads the JWT out of a response, tolerating a few common field names. */
 function extractToken(data: Record<string, unknown>): string {
   const token =
