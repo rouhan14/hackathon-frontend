@@ -21,6 +21,7 @@ import {
 import { clearToken } from "@/lib/auth";
 import { useWorkOs } from "@/components/providers/work-os-provider";
 import JiraCallbackHandler from "@/components/integrations/jira-callback-handler";
+import ClickUpCallbackHandler from "@/components/integrations/clickup-callback-handler";
 
 const navigation = [
   { href: "/dashboard", label: "Today", icon: LayoutDashboard },
@@ -172,6 +173,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <main className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 xl:px-10">{children}</main>
       </div>
       <Suspense fallback={null}><JiraCallbackHandler /></Suspense>
+      <Suspense fallback={null}><ClickUpCallbackHandler /></Suspense>
     </div>
   );
 }

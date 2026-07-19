@@ -54,6 +54,42 @@ export interface JiraSearchResponse {
   };
 }
 
+export interface ClickUpTask {
+  id: string;
+  name: string;
+  status?: string;
+  assignees: string[];
+  priority?: string;
+  dueDate?: string;
+  updatedAt?: string;
+  url?: string;
+  listName?: string;
+  workspaceName?: string;
+}
+
+export interface ClickUpSearchResponse {
+  connectionId: string;
+  query: string;
+  taskCount: number;
+  tasks: ClickUpTask[];
+  empty: boolean;
+  note?: string;
+}
+
+export type ClickUpErrorCode =
+  | "CLICKUP_REAUTH_REQUIRED"
+  | "CLICKUP_RATE_LIMITED";
+
+export class ClickUpIntegrationError extends Error {
+  constructor(
+    public readonly code: ClickUpErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ClickUpIntegrationError";
+  }
+}
+
 /** Thrown when Jira credentials need re-authorization (search 401). */
 export class JiraReauthRequiredError extends Error {
   constructor(message = "Jira must be connected again") {
@@ -150,6 +186,89 @@ export async function connectJira(): Promise<void> {
   window.location.assign(authorizationUrl);
 }
 
+/** Starts hosted ClickUp MCP OAuth without exposing app or provider tokens. */
+export async function connectClickUp(): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  const data = await request<{ authorizationUrl?: string }>(
+    "/auth/clickup",
+    { method: "GET" },
+    { authenticated: true },
+  );
+  if (typeof data.authorizationUrl !== "string" || !data.authorizationUrl) {
+    throw new Error("Could not start ClickUp authorization");
+  }
+  window.location.assign(data.authorizationUrl);
+}
+
+async function clickUpRequest<T>(path: string, init: RequestInit): Promise<T> {
+  let response: Response;
+  try {
+    response = await authFetch(path, init);
+  } catch {
+    throw new Error("Unable to reach the server. Please try again.");
+  }
+
+  let data: unknown = null;
+  try {
+    data = await response.json();
+  } catch {
+    // The fallback below handles non-JSON errors.
+  }
+
+  if (!response.ok) {
+    const body = data as
+      | { code?: string; message?: string | { code?: string; message?: string }; error?: string }
+      | null;
+    const nested = body?.message && typeof body.message === "object" ? body.message : null;
+    const code = body?.code ?? nested?.code;
+    const message =
+      (typeof body?.message === "string" ? body.message : nested?.message) ??
+      body?.error ??
+      `ClickUp request failed (${response.status}).`;
+
+    if (code === "CLICKUP_REAUTH_REQUIRED" || code === "CLICKUP_RATE_LIMITED") {
+      throw new ClickUpIntegrationError(code, message);
+    }
+    if (response.status === 401) {
+      setAuthNotice(message);
+      clearToken();
+    }
+    throw new Error(message);
+  }
+
+  return data as T;
+}
+
+export function searchClickUp(
+  connectionId: string,
+  query: string,
+  limit = 10,
+): Promise<ClickUpSearchResponse> {
+  const normalizedQuery = query.trim();
+  if (!normalizedQuery) throw new Error("Enter a ClickUp task search.");
+  const normalizedLimit = Math.min(25, Math.max(1, Math.floor(limit) || 10));
+  return clickUpRequest<ClickUpSearchResponse>(
+    `/integrations/clickup/${encodeURIComponent(connectionId)}/search`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: normalizedQuery, limit: normalizedLimit }),
+    },
+  );
+}
+
+export async function getClickUpTask(
+  connectionId: string,
+  taskId: string,
+): Promise<ClickUpTask> {
+  const data = await clickUpRequest<{ connectionId: string; task: ClickUpTask }>(
+    `/integrations/clickup/${encodeURIComponent(connectionId)}/tasks/${encodeURIComponent(taskId)}`,
+    { method: "GET" },
+  );
+  return data.task;
+}
+
 /**
  * Search issues with JQL for an owned connection.
  *
@@ -230,5 +349,7 @@ export async function refreshAfterJiraConnect(): Promise<{
   ]);
   return { connections };
 }
+
+export const refreshAfterClickUpConnect = refreshAfterJiraConnect;
 
 export { disconnectIntegration };

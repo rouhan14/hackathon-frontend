@@ -6,6 +6,7 @@ import {
   startNotionOAuth,
 } from "@/lib/auth";
 import {
+  connectClickUp,
   connectJira,
   listIntegrations as listBackendIntegrations,
 } from "@/lib/integrations";
@@ -38,6 +39,7 @@ function unavailable(area: string): never {
 function providerToSource(provider: string): Source {
   const normalized = provider.toLowerCase();
   if (normalized.includes("notion")) return "notion";
+  if (normalized.includes("clickup")) return "clickup";
   if (normalized.includes("calendar")) return "calendar";
   if (normalized.includes("gmail")) return "gmail";
   if (normalized.includes("slack")) return "slack";
@@ -106,7 +108,12 @@ export const httpWorkOsClient: WorkOsClient = {
     return rows.map<Integration>((row) => ({
       id: row.id,
       provider: providerToSource(row.provider),
-      name: providerToSource(row.provider) === "notion" ? "Notion" : "Jira",
+      name:
+        providerToSource(row.provider) === "notion"
+          ? "Notion"
+          : providerToSource(row.provider) === "clickup"
+            ? "ClickUp"
+            : "Jira",
       status: normalizeIntegrationStatus(String(row.status)),
       accountName: row.accountName ?? undefined,
       workspaceName: row.workspaceName ?? undefined,
@@ -117,6 +124,7 @@ export const httpWorkOsClient: WorkOsClient = {
   },
   async connectIntegration(provider) {
     if (provider === "jira") return connectJira();
+    if (provider === "clickup") return connectClickUp();
     startNotionOAuth();
   },
   async disconnectIntegration(id) {

@@ -6,6 +6,7 @@ import {
   Check,
   Clock3,
   FileText,
+  ListChecks,
   Plus,
   RefreshCw,
   ShieldCheck,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { useWorkOs } from "@/components/providers/work-os-provider";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { ClickUpTaskExplorer } from "@/components/integrations/clickup-task-explorer";
 import { EmptyState, ErrorState, LoadingSkeleton } from "@/components/shared/states";
 import type { Integration } from "@/lib/data-client/types";
 import { useAsyncResource } from "@/lib/use-async-resource";
@@ -28,14 +30,21 @@ const statusLabels: Record<Integration["status"], string> = {
   error: "Connection error",
 };
 
+type ConnectableProvider = "jira" | "notion" | "clickup";
+
+function providerName(provider: ConnectableProvider): string {
+  if (provider === "clickup") return "ClickUp";
+  return provider === "jira" ? "Jira" : "Notion";
+}
+
 function IntegrationCard({ integration, onConnect, onDisconnect, busy }: { integration: Integration; onConnect(): void; onDisconnect(): void; busy: boolean }) {
   const connected = integration.status === "connected";
   const warning = ["permission-required", "reauth-required", "error", "no-sites"].includes(integration.status);
-  const Icon = integration.provider === "jira" ? Tickets : FileText;
+  const Icon = integration.provider === "jira" ? Tickets : integration.provider === "clickup" ? ListChecks : FileText;
   return (
     <article className="surface-card flex flex-col p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><span className={`grid h-11 w-11 place-items-center rounded-xl ${integration.provider === "jira" ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200" : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-white"}`}><Icon size={21} /></span><div><h3 className="font-semibold text-slate-950 dark:text-white">{integration.name}</h3><p className={`mt-0.5 flex items-center gap-1 text-xs font-medium ${warning ? "text-amber-700 dark:text-amber-300" : connected ? "text-emerald-700 dark:text-emerald-300" : "text-slate-500"}`}>{warning ? <AlertTriangle size={13} /> : connected ? <Check size={13} /> : <Unplug size={13} />}{statusLabels[integration.status]}</p></div></div></div>
-      <p className="mt-5 text-sm leading-6 text-slate-500">{integration.provider === "jira" ? "Bring Jira issues, projects, blockers, and safe update proposals into your work view." : "Search trusted workspace pages and databases alongside your operational work."}</p>
+      <p className="mt-5 text-sm leading-6 text-slate-500">{integration.provider === "jira" ? "Bring Jira issues, projects, blockers, and safe update proposals into your work view." : integration.provider === "clickup" ? "Search tasks and retrieve current task details from the workspaces selected during ClickUp consent." : "Search trusted workspace pages and databases alongside your operational work."}</p>
       {(integration.accountName || integration.workspaceName) && <dl className="mt-5 grid gap-3 rounded-xl bg-slate-50 p-4 text-sm dark:bg-slate-900"><div><dt className="text-xs text-slate-500">Account</dt><dd className="mt-1 font-medium">{integration.accountName ?? "Connected account"}</dd></div><div><dt className="text-xs text-slate-500">Workspace / site</dt><dd className="mt-1 font-medium">{integration.workspaceName ?? "Default workspace"}</dd></div></dl>}
       {integration.warning && <div role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-100">{integration.warning}</div>}
       {connected && <div className="mt-5"><p className="eyebrow">Granted capabilities</p><ul className="mt-3 flex flex-wrap gap-2">{integration.grantedCapabilities.map((capability) => <li key={capability} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"><ShieldCheck size={12} />{capability}</li>)}</ul>{integration.lastSuccessfulActivity && <p className="mt-4 flex items-center gap-1.5 text-xs text-slate-500"><Clock3 size={13} />Last activity {new Date(integration.lastSuccessfulActivity).toLocaleString()}</p>}</div>}
@@ -46,7 +55,7 @@ function IntegrationCard({ integration, onConnect, onDisconnect, busy }: { integ
 
 export function IntegrationsPage() {
   const { client, isMockMode, version, refresh, notify } = useWorkOs();
-  const [busyProvider, setBusyProvider] = useState<"jira" | "notion" | null>(null);
+  const [busyProvider, setBusyProvider] = useState<ConnectableProvider | null>(null);
   const [disconnecting, setDisconnecting] = useState<Integration | null>(null);
   const [disconnectBusy, setDisconnectBusy] = useState(false);
   const load = useCallback((signal: AbortSignal) => client.listIntegrations({ signal }), [client]);
@@ -54,17 +63,17 @@ export function IntegrationsPage() {
   const cards = useMemo(() => {
     if (resource.status !== "ready") return [];
     const rows = [...resource.data];
-    for (const provider of ["jira", "notion"] as const) {
-      if (!rows.some((row) => row.provider === provider)) rows.push({ id: `disconnected-${provider}`, provider, name: provider === "jira" ? "Jira" : "Notion", status: "disconnected", grantedCapabilities: [], supportsMultipleSites: provider === "jira" });
+    for (const provider of ["jira", "notion", "clickup"] as const) {
+      if (!rows.some((row) => row.provider === provider)) rows.push({ id: `disconnected-${provider}`, provider, name: providerName(provider), status: "disconnected", grantedCapabilities: [], supportsMultipleSites: provider === "jira" });
     }
     return rows;
   }, [resource]);
 
-  async function connect(provider: "jira" | "notion") {
+  async function connect(provider: ConnectableProvider) {
     setBusyProvider(provider);
     try {
       await client.connectIntegration(provider);
-      if (isMockMode) notify(`${provider === "jira" ? "Jira" : "Notion"} connected in demo mode. No external account changed.`, "success");
+      if (isMockMode) notify(`${providerName(provider)} connected in demo mode. No external account changed.`, "success");
       refresh();
     } catch (error) {
       notify(error instanceof Error ? error.message : "Could not start connection.", "error");
@@ -95,8 +104,9 @@ export function IntegrationsPage() {
         {resource.status === "loading" && <div className="grid gap-4 lg:grid-cols-2"><LoadingSkeleton lines={4} /><LoadingSkeleton lines={4} /></div>}
         {resource.status === "error" && <ErrorState error={resource.error} onRetry={resource.retry} />}
         {resource.status === "ready" && cards.length === 0 && <EmptyState title="No workplace providers available" description="Provider cards will appear when a connection is supported." />}
-        {resource.status === "ready" && <div className="grid gap-4 lg:grid-cols-2">{cards.map((integration) => <IntegrationCard key={integration.id} integration={integration} busy={busyProvider === integration.provider} onConnect={() => void connect(integration.provider === "notion" ? "notion" : "jira")} onDisconnect={() => setDisconnecting(integration)} />)}</div>}
+        {resource.status === "ready" && <div className="grid gap-4 lg:grid-cols-2">{cards.map((integration) => <IntegrationCard key={integration.id} integration={integration} busy={busyProvider === integration.provider} onConnect={() => void connect(integration.provider as ConnectableProvider)} onDisconnect={() => setDisconnecting(integration)} />)}</div>}
       </div>
+      {resource.status === "ready" && !isMockMode && cards.filter((item) => item.provider === "clickup" && item.status === "connected").map((item) => <ClickUpTaskExplorer key={item.id} connectionId={item.id} onReconnect={() => void connect("clickup")} />)}
       {resource.status === "ready" && cards.some((item) => item.provider === "jira" && item.status === "connected") && <section className="mt-5 flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950 sm:flex-row sm:items-center"><div><h3 className="font-semibold">Need another Jira site?</h3><p className="mt-1 text-sm text-slate-500">Authorize an additional site without removing the existing connection.</p></div><button type="button" className="button-secondary shrink-0" disabled={busyProvider !== null} onClick={() => void connect("jira")}><Plus size={15} />Connect another site</button></section>}
       <ConfirmDialog open={disconnecting !== null} title={`Disconnect ${disconnecting?.name ?? "provider"}?`} description="This removes the selected connection from AI Work OS. Other provider sites stay connected." confirmLabel="Disconnect" tone="danger" busy={disconnectBusy} onConfirm={() => void disconnect()} onClose={() => !disconnectBusy && setDisconnecting(null)} />
     </div>

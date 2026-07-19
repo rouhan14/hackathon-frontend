@@ -156,7 +156,9 @@ export function isAppSessionUnauthorized(
     code === "MODEL_NOT_AVAILABLE" ||
     code === "MODEL_UPSTREAM_ERROR" ||
     code === "JIRA_REAUTH_REQUIRED" ||
-    code === "JIRA_SEARCH_PERMISSION_REQUIRED"
+    code === "JIRA_SEARCH_PERMISSION_REQUIRED" ||
+    code === "CLICKUP_REAUTH_REQUIRED" ||
+    code === "CLICKUP_RATE_LIMITED"
   ) {
     return false;
   }
@@ -164,6 +166,9 @@ export function isAppSessionUnauthorized(
     return false;
   }
   if (/jira connection must be authorized again/i.test(message)) {
+    return false;
+  }
+  if (/clickup connection must be authorized again|clickup mcp rate limit/i.test(message)) {
     return false;
   }
   // Default: authenticated-route 401 → treat as session loss (Nest JWT guard).

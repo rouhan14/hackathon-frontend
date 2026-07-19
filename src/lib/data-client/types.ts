@@ -1,4 +1,10 @@
-export type Source = "jira" | "notion" | "calendar" | "gmail" | "slack";
+export type Source =
+  | "jira"
+  | "notion"
+  | "clickup"
+  | "calendar"
+  | "gmail"
+  | "slack";
 
 export type IntegrationStatus =
   | "disconnected"
@@ -206,7 +212,7 @@ export interface WorkOsClient {
   getDashboard(options?: ClientRequestOptions): Promise<DashboardData>;
   listIntegrations(options?: ClientRequestOptions): Promise<Integration[]>;
   connectIntegration(
-    provider: "jira" | "notion",
+    provider: "jira" | "notion" | "clickup",
     options?: ClientRequestOptions,
   ): Promise<void>;
   disconnectIntegration(id: string, options?: ClientRequestOptions): Promise<void>;

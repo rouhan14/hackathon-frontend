@@ -3,6 +3,7 @@ import {
   FileText,
   Mail,
   MessageSquare,
+  ListChecks,
   Tickets,
 } from "lucide-react";
 import type { Source } from "@/lib/data-client/types";
@@ -10,6 +11,7 @@ import type { Source } from "@/lib/data-client/types";
 const labels: Record<Source, string> = {
   jira: "Jira",
   notion: "Notion",
+  clickup: "ClickUp",
   calendar: "Calendar",
   gmail: "Gmail",
   slack: "Slack",
@@ -18,6 +20,7 @@ const labels: Record<Source, string> = {
 const icons = {
   jira: Tickets,
   notion: FileText,
+  clickup: ListChecks,
   calendar: CalendarDays,
   gmail: Mail,
   slack: MessageSquare,

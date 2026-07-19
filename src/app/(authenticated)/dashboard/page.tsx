@@ -8,6 +8,7 @@ import {
   Circle,
   Clock3,
   FileText,
+  ListChecks,
   Sparkles,
   Tickets,
 } from "lucide-react";
@@ -20,18 +21,18 @@ import { useAsyncResource } from "@/lib/use-async-resource";
 
 export default function DashboardPage() {
   const { client, user, version, refresh, isMockMode, notify } = useWorkOs();
-  const [connecting, setConnecting] = useState<"jira" | "notion" | null>(null);
+  const [connecting, setConnecting] = useState<"jira" | "notion" | "clickup" | null>(null);
   const load = useCallback((signal: AbortSignal) => client.getDashboard({ signal }), [client]);
   const dashboard = useAsyncResource(load, [version]);
 
-  async function connect(provider: "jira" | "notion") {
+  async function connect(provider: "jira" | "notion" | "clickup") {
     setConnecting(provider);
     try {
       await client.connectIntegration(provider);
       notify(
         isMockMode
-          ? `${provider === "jira" ? "Jira" : "Notion"} demo source connected. No external account was changed.`
-          : `Opening ${provider === "jira" ? "Jira" : "Notion"} authorization.`,
+          ? `${provider === "jira" ? "Jira" : provider === "clickup" ? "ClickUp" : "Notion"} demo source connected. No external account was changed.`
+          : `Opening ${provider === "jira" ? "Jira" : provider === "clickup" ? "ClickUp" : "Notion"} authorization.`,
         "success",
       );
       refresh();
@@ -65,6 +66,7 @@ export default function DashboardPage() {
               <div className="mt-6 flex flex-wrap gap-3">
                 <button type="button" className="button-primary" disabled={connecting !== null} onClick={() => connect("jira")}><Tickets size={16} />{connecting === "jira" ? "Connecting…" : "Connect Jira"}</button>
                 <button type="button" className="button-secondary" disabled={connecting !== null} onClick={() => connect("notion")}><FileText size={16} />{connecting === "notion" ? "Connecting…" : "Connect Notion"}</button>
+                <button type="button" className="button-secondary" disabled={connecting !== null} onClick={() => connect("clickup")}><ListChecks size={16} />{connecting === "clickup" ? "Connecting…" : "Connect ClickUp"}</button>
               </div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 dark:border-slate-800 dark:bg-slate-950/70">

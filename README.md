@@ -30,6 +30,24 @@ Open [http://localhost:3000](http://localhost:3000).
 4. The UI calls `POST /assistant/ask`; tool traces (e.g. `jira_search`) show under the answer.
 5. Conversation history is stored in the browser until the backend adds durable threads.
 
+### ClickUp hosted MCP
+
+ClickUp authorization is initiated through the authenticated backend endpoint
+`GET /auth/clickup`. The browser navigates only to the returned
+`authorizationUrl`; ClickUp credentials and raw MCP responses never enter the
+frontend.
+
+Set the backend's `CLICKUP_POST_AUTH_REDIRECT` to either of these frontend
+routes:
+
+- `https://app.example.com/integrations`
+- `https://app.example.com/settings/integrations`
+
+Both routes handle `?clickup=connected`, `?clickup=unsupported`, and
+`?clickup=error`, remove the callback parameter, and refresh the connection
+list. Connected users can search and retrieve normalized ClickUp tasks from the
+Integrations page. Rate-limited requests are not retried automatically.
+
 ### Mock mode
 
 Set `NEXT_PUBLIC_DATA_MODE=mock` in `.env.local` for a full offline demo without the API.

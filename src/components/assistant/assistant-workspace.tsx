@@ -31,6 +31,7 @@ const sourceOptions: Array<{ value: Source | "all"; label: string }> = [
   { value: "all", label: "All sources" },
   { value: "jira", label: "Jira" },
   { value: "notion", label: "Notion" },
+  { value: "clickup", label: "ClickUp" },
   { value: "calendar", label: "Calendar" },
   { value: "gmail", label: "Gmail" },
 ];

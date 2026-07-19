@@ -34,4 +34,19 @@ describe("isAppSessionUnauthorized", () => {
       ),
     ).toBe(false);
   });
+
+  it("does not treat ClickUp provider failures as app logout", () => {
+    expect(
+      isAppSessionUnauthorized(
+        "CLICKUP_REAUTH_REQUIRED",
+        "The ClickUp connection must be authorized again.",
+      ),
+    ).toBe(false);
+    expect(
+      isAppSessionUnauthorized(
+        "CLICKUP_RATE_LIMITED",
+        "ClickUp MCP rate limit reached.",
+      ),
+    ).toBe(false);
+  });
 });

@@ -189,11 +189,13 @@ summary:focus-visible {
 
 .source-jira { background: #eaf2ff; color: #0747a6; }
 .source-notion { background: #f1f5f9; color: #334155; }
+.source-clickup { background: #f2edff; color: #6c3ad1; }
 .source-calendar { background: #e9f8ef; color: #197345; }
 .source-gmail { background: #fff0ed; color: #a83224; }
 .source-slack { background: #f6eefa; color: #6b2577; }
 .dark .source-jira { background: #102950; color: #bfdbfe; }
 .dark .source-notion { background: #263147; color: #e2e8f0; }
+.dark .source-clickup { background: #322254; color: #ddd0ff; }
 .dark .source-calendar { background: #113423; color: #bbf7d0; }
 .dark .source-gmail { background: #451b1b; color: #fecaca; }
 .dark .source-slack { background: #392042; color: #f5d0fe; }

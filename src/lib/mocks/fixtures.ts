@@ -104,6 +104,16 @@ export const workItems: WorkItem[] = [
 
 export const returningIntegrations: Integration[] = [
   {
+    id: "integration-clickup-main",
+    provider: "clickup",
+    name: "ClickUp",
+    status: "connected",
+    accountName: "ClickUp",
+    workspaceName: "Authorized ClickUp workspaces",
+    grantedCapabilities: ["Search tasks", "Read task details"],
+    lastSuccessfulActivity: "2026-07-18T08:45:00.000Z",
+  },
+  {
     id: "integration-jira-main",
     provider: "jira",
     name: "Jira",
