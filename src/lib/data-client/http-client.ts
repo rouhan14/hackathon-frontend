@@ -4,6 +4,7 @@ import {
   getUser,
   request,
   startNotionOAuth,
+  startNotionMcpOAuth,
 } from "@/lib/auth";
 import {
   connectJira,
@@ -103,20 +104,27 @@ export const httpWorkOsClient: WorkOsClient = {
   },
   async listIntegrations() {
     const rows = await listBackendIntegrations();
-    return rows.map<Integration>((row) => ({
-      id: row.id,
-      provider: providerToSource(row.provider),
-      name: providerToSource(row.provider) === "notion" ? "Notion" : "Jira",
-      status: normalizeIntegrationStatus(String(row.status)),
-      accountName: row.accountName ?? undefined,
-      workspaceName: row.workspaceName ?? undefined,
-      grantedCapabilities: row.grantedScopes,
-      lastSuccessfulActivity: row.lastSuccessfulSyncAt ?? undefined,
-      supportsMultipleSites: providerToSource(row.provider) === "jira",
-    }));
+    return rows.map<Integration>((row) => {
+      const source = providerToSource(row.provider);
+      const isMcp = row.provider.toUpperCase().includes("MCP") || row.provider.toUpperCase().includes("NOTION_MCP");
+      
+      return {
+        id: row.id,
+        provider: source,
+        name: source === "notion" && isMcp ? "Notion AI Assistant" : source === "notion" ? "Notion" : "Jira",
+        status: normalizeIntegrationStatus(String(row.status)),
+        accountName: row.accountName ?? undefined,
+        workspaceName: row.workspaceName ?? undefined,
+        grantedCapabilities: row.grantedScopes,
+        lastSuccessfulActivity: row.lastSuccessfulSyncAt ?? undefined,
+        supportsMultipleSites: source === "jira",
+        isMcp: source === "notion" ? isMcp : undefined,
+      };
+    });
   },
   async connectIntegration(provider) {
     if (provider === "jira") return connectJira();
+    if (provider === "notion-mcp") return startNotionMcpOAuth();
     startNotionOAuth();
   },
   async disconnectIntegration(id) {
@@ -141,8 +149,14 @@ export const httpWorkOsClient: WorkOsClient = {
   },
   async askAssistant(input: AskInput, options?: ClientRequestOptions) {
     try {
+      // Use /assistant/chat endpoint when a single source is selected (Notion or Jira)
+      const isSingleSource = input.sources?.length === 1;
+      const selectedSource = input.sources?.[0];
+      const usesChatEndpoint = isSingleSource && (selectedSource === "notion" || selectedSource === "jira");
+      const endpoint = usesChatEndpoint ? "/assistant/chat" : "/assistant/ask";
+
       const backend = await request<BackendAssistantAskResponse>(
-        "/assistant/ask",
+        endpoint,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -152,6 +166,25 @@ export const httpWorkOsClient: WorkOsClient = {
         { authenticated: true },
       );
 
+      // Handle the different response format from /assistant/chat
+      if (usesChatEndpoint) {
+        // /assistant/chat returns { message: "response" }
+        const chatResponse = backend as unknown as { message: string };
+        if (!chatResponse || typeof chatResponse.message !== "string") {
+          throw new WorkOsClientError(
+            "unexpected",
+            "The assistant returned an unexpected response shape.",
+          );
+        }
+        
+        // Convert to the expected format
+        return mergeAskIntoThread(input, {
+          answer: chatResponse.message,
+          toolCalls: [],
+        });
+      }
+
+      // Handle the standard /assistant/ask response
       if (!backend || typeof backend.answer !== "string") {
         throw new WorkOsClientError(
           "unexpected",

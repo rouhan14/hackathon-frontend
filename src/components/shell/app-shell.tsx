@@ -21,6 +21,7 @@ import {
 import { clearToken } from "@/lib/auth";
 import { useWorkOs } from "@/components/providers/work-os-provider";
 import JiraCallbackHandler from "@/components/integrations/jira-callback-handler";
+import NotionMcpCallbackHandler from "@/components/integrations/notion-mcp-callback-handler";
 
 const navigation = [
   { href: "/dashboard", label: "Today", icon: LayoutDashboard },
@@ -171,7 +172,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <main className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 xl:px-10">{children}</main>
       </div>
-      <Suspense fallback={null}><JiraCallbackHandler /></Suspense>
+      <Suspense fallback={null}>
+        <JiraCallbackHandler />
+        <NotionMcpCallbackHandler />
+      </Suspense>
     </div>
   );
 }

@@ -145,7 +145,7 @@ function postJson<T>(path: string, body: unknown): Promise<T> {
 
 /**
  * True when a 401 means the browser JWT is invalid/expired.
- * False for upstream failures that also use 401 (legacy model auth, Jira reauth).
+ * False for upstream failures that also use 401 (legacy model auth, Jira reauth, Notion MCP reauth).
  */
 export function isAppSessionUnauthorized(
   code: string | undefined,
@@ -156,7 +156,9 @@ export function isAppSessionUnauthorized(
     code === "MODEL_NOT_AVAILABLE" ||
     code === "MODEL_UPSTREAM_ERROR" ||
     code === "JIRA_REAUTH_REQUIRED" ||
-    code === "JIRA_SEARCH_PERMISSION_REQUIRED"
+    code === "JIRA_SEARCH_PERMISSION_REQUIRED" ||
+    code === "MCP_REAUTH_REQUIRED" ||
+    code === "NOTION_MCP_REAUTH_REQUIRED"
   ) {
     return false;
   }
@@ -164,6 +166,9 @@ export function isAppSessionUnauthorized(
     return false;
   }
   if (/jira connection must be authorized again/i.test(message)) {
+    return false;
+  }
+  if (/notion (mcp|ai) (connection )?must be (re)?authorized|notion ai access expired/i.test(message)) {
     return false;
   }
   // Default: authenticated-route 401 → treat as session loss (Nest JWT guard).
@@ -214,6 +219,21 @@ export async function disconnectIntegration(
 export async function startNotionOAuth(): Promise<void> {
   const { authorizationUrl } = await request<{ authorizationUrl: string }>(
     "/auth/notion",
+    { method: "GET" },
+    { authenticated: true }
+  );
+
+  window.location.href = authorizationUrl;
+}
+
+/**
+ * Starts the Notion MCP OAuth flow via a full-page redirect to GET /auth/notion/mcp.
+ * This is separate from the REST API OAuth flow and grants access to Notion AI features
+ * via the Model Context Protocol.
+ */
+export async function startNotionMcpOAuth(): Promise<void> {
+  const { authorizationUrl } = await request<{ authorizationUrl: string }>(
+    "/auth/notion/mcp",
     { method: "GET" },
     { authenticated: true }
   );
