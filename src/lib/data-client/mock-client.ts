@@ -352,14 +352,41 @@ export const mockWorkOsClient: WorkOsClient = {
     await delay(options, 650);
     updateState((state) => {
       const wasFirstTime = state.scenario === "first-time";
-      const exists = state.integrations.some((item) => item.provider === provider);
-      if (exists) return;
-      const fixture = returningIntegrations.find((item) => item.provider === provider);
-      if (fixture) state.integrations.push(clone(fixture));
+      
+      // Handle Notion MCP separately from Notion REST
+      if (provider === "notion-mcp") {
+        const exists = state.integrations.some((item) => item.provider === "notion" && item.isMcp);
+        if (!exists) {
+          state.integrations.push({
+            id: `integration-notion-mcp-${Date.now()}`,
+            provider: "notion",
+            name: "Notion AI Assistant",
+            status: "connected",
+            accountName: "Demo Workspace",
+            workspaceName: "AI Work OS Demo",
+            grantedCapabilities: ["AI Search", "Context Retrieval"],
+            lastSuccessfulActivity: new Date().toISOString(),
+            isMcp: true,
+          });
+        }
+      } else {
+        const exists = state.integrations.some((item) => item.provider === provider && !item.isMcp);
+        if (!exists) {
+          const fixture = returningIntegrations.find((item) => item.provider === provider);
+          if (fixture) {
+            const integration = clone(fixture);
+            if (provider === "notion") {
+              integration.isMcp = false;
+            }
+            state.integrations.push(integration);
+          }
+        }
+      }
+      
       state.scenario = "returning";
       if (wasFirstTime) {
         state.approvals = clone(
-          baseApprovals.filter((proposal) => proposal.source === provider),
+          baseApprovals.filter((proposal) => proposal.source === provider || (provider === "notion-mcp" && proposal.source === "notion")),
         );
       }
     });

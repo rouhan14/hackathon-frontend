@@ -123,6 +123,7 @@ export const returningIntegrations: Integration[] = [
     workspaceName: "AI Work OS",
     grantedCapabilities: ["Read pages", "Search workspace"],
     lastSuccessfulActivity: "2026-07-18T08:37:00.000Z",
+    isMcp: false,
   },
 ];
 
