@@ -30,11 +30,10 @@ const statusLabels: Record<Integration["status"], string> = {
   error: "Connection error",
 };
 
-type ConnectableProvider = "jira" | "notion" | "clickup" | "notion-mcp";
+type ConnectableProvider = "jira" | "notion" | "clickup";
 
 function providerName(provider: ConnectableProvider): string {
   if (provider === "clickup") return "ClickUp";
-  if (provider === "notion-mcp") return "Notion AI Assistant";
   return provider === "jira" ? "Jira" : "Notion";
 }
 
@@ -43,14 +42,12 @@ function IntegrationCard({ integration, onConnect, onDisconnect, busy }: { integ
   const warning = ["permission-required", "reauth-required", "error", "no-sites"].includes(integration.status);
   const Icon = integration.provider === "jira" ? Tickets : integration.provider === "clickup" ? ListChecks : FileText;
 
-  // Determine description based on provider and MCP status
+  // Determine description based on provider
   let description = "";
   if (integration.provider === "jira") {
     description = "Bring Jira issues, projects, blockers, and safe update proposals into your work view.";
   } else if (integration.provider === "clickup") {
     description = "Search tasks and retrieve current task details from the workspaces selected during ClickUp consent.";
-  } else if (integration.provider === "notion" && integration.isMcp) {
-    description = "Enable AI-powered search and context from your Notion workspace using the Model Context Protocol.";
   } else if (integration.provider === "notion") {
     description = "Search trusted workspace pages and databases alongside your operational work.";
   }
@@ -100,30 +97,17 @@ export function IntegrationsPage() {
       });
     }
 
-    // Add Notion REST if not present
-    if (!rows.some((row) => row.provider === "notion" && !row.isMcp)) {
-      rows.push({ 
-        id: `disconnected-notion`, 
-        provider: "notion", 
-        name: "Notion", 
-        status: "disconnected", 
+    // Add Notion if not present
+    if (!rows.some((row) => row.provider === "notion")) {
+      rows.push({
+        id: `disconnected-notion`,
+        provider: "notion",
+        name: "Notion",
+        status: "disconnected",
         grantedCapabilities: [],
-        isMcp: false
       });
     }
-    
-    // Add Notion MCP if not present
-    if (!rows.some((row) => row.provider === "notion" && row.isMcp)) {
-      rows.push({ 
-        id: `disconnected-notion-mcp`, 
-        provider: "notion", 
-        name: "Notion AI Assistant", 
-        status: "disconnected", 
-        grantedCapabilities: [],
-        isMcp: true
-      });
-    }
-    
+
     return rows;
   }, [resource]);
 
@@ -158,7 +142,6 @@ export function IntegrationsPage() {
   function getConnectProvider(integration: Integration): ConnectableProvider {
     if (integration.provider === "jira") return "jira";
     if (integration.provider === "clickup") return "clickup";
-    if (integration.provider === "notion" && integration.isMcp) return "notion-mcp";
     return "notion";
   }
 
