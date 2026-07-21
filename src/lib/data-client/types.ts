@@ -105,6 +105,8 @@ export interface Integration {
   lastSuccessfulActivity?: string;
   warning?: string;
   supportsMultipleSites?: boolean;
+  /** For Notion only: indicates this is the MCP (AI Assistant) connection */
+  isMcp?: boolean;
 }
 
 export interface ActivityItem {
@@ -212,7 +214,7 @@ export interface WorkOsClient {
   getDashboard(options?: ClientRequestOptions): Promise<DashboardData>;
   listIntegrations(options?: ClientRequestOptions): Promise<Integration[]>;
   connectIntegration(
-    provider: "jira" | "notion" | "clickup",
+    provider: "jira" | "notion" | "clickup" | "notion-mcp",
     options?: ClientRequestOptions,
   ): Promise<void>;
   disconnectIntegration(id: string, options?: ClientRequestOptions): Promise<void>;
