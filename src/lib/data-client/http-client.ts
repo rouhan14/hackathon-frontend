@@ -1,5 +1,6 @@
 import {
   disconnectIntegration,
+  ApiRequestError,
   fetchMe,
   getUser,
   request,
@@ -12,39 +13,28 @@ import {
   listIntegrations as listBackendIntegrations,
 } from "@/lib/integrations";
 import {
-  formatNestErrorBody,
   mergeAskIntoThread,
   type BackendAssistantAskResponse,
 } from "./assistant-ask";
-import {
-  getStoredThread,
-  listStoredThreads,
-} from "./assistant-thread-store";
+import { getStoredThread, listStoredThreads } from "./assistant-thread-store";
 import type {
   AskInput,
   ClientRequestOptions,
   Integration,
   IntegrationStatus,
-  Source,
   WorkOsClient,
 } from "./types";
 import { WorkOsClientError } from "./types";
+import {
+  providerToSource,
+  sourceToBackendProvider,
+} from "@/lib/provider-format";
 
 function unavailable(area: string): never {
   throw new WorkOsClientError(
     "backend-unavailable",
     `${area} is not available from the backend yet. Switch to mock mode for the frontend demo.`,
   );
-}
-
-function providerToSource(provider: string): Source {
-  const normalized = provider.toLowerCase();
-  if (normalized.includes("notion")) return "notion";
-  if (normalized.includes("clickup")) return "clickup";
-  if (normalized.includes("calendar")) return "calendar";
-  if (normalized.includes("gmail")) return "gmail";
-  if (normalized.includes("slack")) return "slack";
-  return "jira";
 }
 
 export function normalizeIntegrationStatus(status: string): IntegrationStatus {
@@ -66,17 +56,35 @@ export function normalizeIntegrationStatus(status: string): IntegrationStatus {
 
 function mapAskHttpError(error: unknown): never {
   if (error instanceof WorkOsClientError) throw error;
+  if (error instanceof ApiRequestError) {
+    if (error.status === 0 || [502, 503, 504].includes(error.status)) {
+      throw new WorkOsClientError(
+        "backend-unavailable",
+        "The assistant is temporarily unavailable. Please try again in a moment.",
+        true,
+      );
+    }
+    if (error.status === 401) {
+      throw new WorkOsClientError("reauth-required", error.message);
+    }
+    throw new WorkOsClientError(
+      "unexpected",
+      error.message,
+      error.status >= 500,
+    );
+  }
   const message =
     error instanceof Error ? error.message : "The assistant could not answer.";
 
   if (/Unable to reach the server/i.test(message)) {
     throw new WorkOsClientError("backend-unavailable", message, true);
   }
-  // Model / Bedrock failures (502 MODEL_AUTH_FAILED | MODEL_UPSTREAM_ERROR |
-  // MODEL_RESPONSE_PARSE_ERROR, 503 MODEL_NOT_AVAILABLE, 504 MODEL_TIMEOUT) are
-  // server/provider problems, never an app logout. Surface a friendly, retryable
-  // message rather than the raw code.
-  if (/BEDROCK|model provider|MODEL_[A-Z_]+/i.test(message)) {
+  // Model / Bedrock / Groq failures are server/provider problems, never logout.
+  if (
+    /BEDROCK|GROQ|model provider|MODEL_[A-Z_]+|Assistant model is not available/i.test(
+      message,
+    )
+  ) {
     throw new WorkOsClientError(
       "backend-unavailable",
       "The assistant is temporarily unavailable. Please try again in a moment.",
@@ -111,7 +119,9 @@ export const httpWorkOsClient: WorkOsClient = {
     const rows = await listBackendIntegrations();
     return rows.map<Integration>((row) => {
       const source = providerToSource(row.provider);
-      const isMcp = row.provider.toUpperCase().includes("MCP") || row.provider.toUpperCase().includes("NOTION_MCP");
+      const isMcp =
+        row.provider.toUpperCase().includes("MCP") ||
+        row.provider.toUpperCase().includes("NOTION_MCP");
 
       return {
         id: row.id,
@@ -123,7 +133,9 @@ export const httpWorkOsClient: WorkOsClient = {
               ? "Notion"
               : source === "clickup"
                 ? "ClickUp"
-                : "Jira",
+                : source === "slack"
+                  ? "Slack"
+                  : "Jira",
         status: normalizeIntegrationStatus(String(row.status)),
         accountName: row.accountName ?? undefined,
         workspaceName: row.workspaceName ?? undefined,
@@ -165,7 +177,10 @@ export const httpWorkOsClient: WorkOsClient = {
     // so an over-long prompt fails fast instead of round-tripping to a 400.
     const trimmedPrompt = input.prompt.trim();
     if (trimmedPrompt.length === 0) {
-      throw new WorkOsClientError("unexpected", "Enter a question to ask the assistant.");
+      throw new WorkOsClientError(
+        "unexpected",
+        "Enter a question to ask the assistant.",
+      );
     }
     if (trimmedPrompt.length > 4000) {
       throw new WorkOsClientError(
@@ -174,51 +189,23 @@ export const httpWorkOsClient: WorkOsClient = {
       );
     }
     try {
-      // Endpoint routing:
-      //  - No source filter ("All sources" tab) → unified /assistant/brain,
-      //    which chains tools across Jira, Notion, and ClickUp in one request.
-      //  - A single Notion/Jira source → focused /assistant/chat.
-      //  - Anything else → /assistant/ask.
-      const isSingleSource = input.sources?.length === 1;
-      const selectedSource = input.sources?.[0];
-      const usesBrainEndpoint = !input.sources || input.sources.length === 0;
-      const usesChatEndpoint = isSingleSource && (selectedSource === "notion" || selectedSource === "jira");
-      const endpoint = usesBrainEndpoint
-        ? "/assistant/brain"
-        : usesChatEndpoint
-          ? "/assistant/chat"
-          : "/assistant/ask";
-
+      // Unified multi-app brain. Sources are a server-enforced tool filter.
       const backend = await request<BackendAssistantAskResponse>(
-        endpoint,
+        "/assistant/brain",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: input.prompt }),
+          body: JSON.stringify({
+            message: trimmedPrompt,
+            ...(input.sources?.length
+              ? { sources: input.sources.map(sourceToBackendProvider) }
+              : {}),
+          }),
           signal: options?.signal,
         },
         { authenticated: true },
       );
 
-      // Handle the different response format from /assistant/chat
-      if (usesChatEndpoint) {
-        // /assistant/chat returns { message: "response" }
-        const chatResponse = backend as unknown as { message: string };
-        if (!chatResponse || typeof chatResponse.message !== "string") {
-          throw new WorkOsClientError(
-            "unexpected",
-            "The assistant returned an unexpected response shape.",
-          );
-        }
-        
-        // Convert to the expected format
-        return mergeAskIntoThread(input, {
-          answer: chatResponse.message,
-          toolCalls: [],
-        });
-      }
-
-      // Handle the standard /assistant/brain and /assistant/ask response shape.
       if (!backend || typeof backend.answer !== "string") {
         throw new WorkOsClientError(
           "unexpected",
@@ -232,19 +219,6 @@ export const httpWorkOsClient: WorkOsClient = {
       });
     } catch (error) {
       if (options?.signal?.aborted) throw error;
-      // request() already throws Error with a message; normalize Nest-ish bodies if present
-      if (error instanceof Error && error.message.startsWith("{")) {
-        try {
-          const parsed = JSON.parse(error.message) as unknown;
-          throw new WorkOsClientError(
-            "unexpected",
-            formatNestErrorBody(parsed, 500),
-            true,
-          );
-        } catch (inner) {
-          if (inner instanceof WorkOsClientError) throw inner;
-        }
-      }
       mapAskHttpError(error);
     }
   },
