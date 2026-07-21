@@ -170,6 +170,8 @@ export interface AssistantMessage {
     accountName?: string | null;
     status?: string;
   }>;
+  /** Server AgentRun id when the backend persisted the brain call. */
+  runId?: string;
 }
 
 export interface AssistantThread {
