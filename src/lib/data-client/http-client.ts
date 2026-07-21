@@ -72,13 +72,16 @@ function mapAskHttpError(error: unknown): never {
   if (/Unable to reach the server/i.test(message)) {
     throw new WorkOsClientError("backend-unavailable", message, true);
   }
-  // Model / Bedrock credential problems are server config, not app logout.
-  if (
-    /BEDROCK|model provider|MODEL_AUTH_FAILED|MODEL_NOT_AVAILABLE|MODEL_UPSTREAM/i.test(
-      message,
-    )
-  ) {
-    throw new WorkOsClientError("backend-unavailable", message, true);
+  // Model / Bedrock failures (502 MODEL_AUTH_FAILED | MODEL_UPSTREAM_ERROR |
+  // MODEL_RESPONSE_PARSE_ERROR, 503 MODEL_NOT_AVAILABLE, 504 MODEL_TIMEOUT) are
+  // server/provider problems, never an app logout. Surface a friendly, retryable
+  // message rather than the raw code.
+  if (/BEDROCK|model provider|MODEL_[A-Z_]+/i.test(message)) {
+    throw new WorkOsClientError(
+      "backend-unavailable",
+      "The assistant is temporarily unavailable. Please try again in a moment.",
+      true,
+    );
   }
   if (
     /Access token has expired|Invalid access token|Authentication token is missing|Unauthorized\./i.test(
@@ -158,12 +161,33 @@ export const httpWorkOsClient: WorkOsClient = {
     return thread;
   },
   async askAssistant(input: AskInput, options?: ClientRequestOptions) {
+    // The assistant endpoints require message length 1–4000. Validate up front
+    // so an over-long prompt fails fast instead of round-tripping to a 400.
+    const trimmedPrompt = input.prompt.trim();
+    if (trimmedPrompt.length === 0) {
+      throw new WorkOsClientError("unexpected", "Enter a question to ask the assistant.");
+    }
+    if (trimmedPrompt.length > 4000) {
+      throw new WorkOsClientError(
+        "unexpected",
+        "Message is too long (max 4000 characters). Please shorten it and try again.",
+      );
+    }
     try {
-      // Use /assistant/chat endpoint when a single source is selected (Notion or Jira)
+      // Endpoint routing:
+      //  - No source filter ("All sources" tab) → unified /assistant/brain,
+      //    which chains tools across Jira, Notion, and ClickUp in one request.
+      //  - A single Notion/Jira source → focused /assistant/chat.
+      //  - Anything else → /assistant/ask.
       const isSingleSource = input.sources?.length === 1;
       const selectedSource = input.sources?.[0];
+      const usesBrainEndpoint = !input.sources || input.sources.length === 0;
       const usesChatEndpoint = isSingleSource && (selectedSource === "notion" || selectedSource === "jira");
-      const endpoint = usesChatEndpoint ? "/assistant/chat" : "/assistant/ask";
+      const endpoint = usesBrainEndpoint
+        ? "/assistant/brain"
+        : usesChatEndpoint
+          ? "/assistant/chat"
+          : "/assistant/ask";
 
       const backend = await request<BackendAssistantAskResponse>(
         endpoint,
@@ -194,7 +218,7 @@ export const httpWorkOsClient: WorkOsClient = {
         });
       }
 
-      // Handle the standard /assistant/ask response
+      // Handle the standard /assistant/brain and /assistant/ask response shape.
       if (!backend || typeof backend.answer !== "string") {
         throw new WorkOsClientError(
           "unexpected",

@@ -157,6 +157,19 @@ export interface AssistantMessage {
   toolCalls?: AssistantToolCallTrace[];
   model?: string;
   provider?: string;
+  /**
+   * Connections the unified brain could use at request time, echoed from
+   * /assistant/brain. An empty array means the user has nothing connected —
+   * the UI uses this to prompt them to connect an integration. Undefined for
+   * endpoints that don't report it.
+   */
+  availableConnections?: Array<{
+    id: string;
+    provider: string;
+    workspaceName?: string | null;
+    accountName?: string | null;
+    status?: string;
+  }>;
 }
 
 export interface AssistantThread {

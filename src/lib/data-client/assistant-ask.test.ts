@@ -118,7 +118,7 @@ describe("httpWorkOsClient.askAssistant integration mapping", () => {
     vi.restoreAllMocks();
   });
 
-  it("posts message to /assistant/ask and returns a merged thread", async () => {
+  it("posts message to the unified /assistant/brain endpoint (All sources) and returns a merged thread", async () => {
     vi.resetModules();
     vi.doMock("@/lib/auth", () => ({
       disconnectIntegration: vi.fn(),
@@ -146,7 +146,7 @@ describe("httpWorkOsClient.askAssistant integration mapping", () => {
     });
 
     expect(request).toHaveBeenCalledWith(
-      "/assistant/ask",
+      "/assistant/brain",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ message: "What is blocked?" }),
