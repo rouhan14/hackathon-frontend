@@ -71,6 +71,11 @@ function Message({ message }: { message: AssistantMessage }) {
                 )}
               </section>
             )}
+            {message.availableConnections && message.availableConnections.length === 0 && (
+              <section className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100" aria-label="No connected apps">
+                No work apps are connected yet, so the assistant can only answer generally. <Link href="/integrations" className="font-semibold underline underline-offset-2">Connect Jira, Notion, or ClickUp</Link> to get answers from your workspace.
+              </section>
+            )}
             <EvidenceList evidence={message.evidence ?? []} />
             {message.proposalIds && message.proposalIds.length > 0 && (
               <section className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900 dark:bg-indigo-950/40" aria-label="Proposed actions">
@@ -200,7 +205,7 @@ export function AssistantWorkspace({ threadId }: { threadId?: string }) {
 
         <form onSubmit={(event) => { event.preventDefault(); void submit(); }} className="sticky bottom-3 mt-6 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-950">
           <label htmlFor="assistant-prompt" className="sr-only">Message AI Work OS</label>
-          <textarea id="assistant-prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} placeholder="Ask about priorities, blockers, documents, or meetings…" className="field-textarea min-h-20 border-0 bg-transparent" />
+          <textarea id="assistant-prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} placeholder="Ask about priorities, blockers, documents, or meetings…" maxLength={4000} className="field-textarea min-h-20 border-0 bg-transparent" />
           <div className="flex items-center justify-between border-t border-slate-100 px-2 pt-2 dark:border-slate-800"><p className="text-xs text-slate-500">Enter to send · Shift+Enter for a new line</p>{sending ? <button type="button" onClick={() => abortRef.current?.abort()} className="button-secondary"><CircleStop size={16} />Stop</button> : <button type="submit" disabled={!prompt.trim()} className="button-primary">Send <ArrowRight size={16} /></button>}</div>
         </form>
       </section>

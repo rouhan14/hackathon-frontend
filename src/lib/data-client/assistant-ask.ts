@@ -12,13 +12,20 @@ import {
   upsertStoredThread,
 } from "./assistant-thread-store";
 
-/** Shape returned by POST /assistant/ask on the Nest backend. */
+/**
+ * Shape returned by the Nest assistant endpoints.
+ *
+ * `POST /assistant/ask` and the unified `POST /assistant/brain` return every
+ * field. The focused `POST /assistant/chat` endpoint returns only `answer`
+ * (mapped from its `message`) and no tool trace, so provider/model/rounds are
+ * optional here.
+ */
 export interface BackendAssistantAskResponse {
   answer: string;
-  provider: string;
-  model: string;
+  provider?: string;
+  model?: string;
   toolCalls: AssistantToolCallTrace[];
-  rounds: number;
+  rounds?: number;
   availableConnections?: Array<{
     id: string;
     provider: string;
@@ -73,6 +80,7 @@ export function mergeAskIntoThread(
     toolCalls: backend.toolCalls ?? [],
     model: backend.model,
     provider: backend.provider,
+    availableConnections: backend.availableConnections,
   };
 
   thread.messages.push(userMessage, assistantMessage);
