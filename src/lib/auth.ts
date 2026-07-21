@@ -46,7 +46,7 @@ export function authHeaders(): Record<string, string> {
  */
 export function authFetch(
   path: string,
-  init: RequestInit = {}
+  init: RequestInit = {},
 ): Promise<Response> {
   return fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -64,17 +64,32 @@ type RequestOptions = {
   authenticated?: boolean;
 };
 
+export class ApiRequestError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly code?: string,
+    public readonly body?: unknown,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
 /** Runs a request and parses the JSON body, throwing a readable error on failure. */
 export async function request<T>(
   path: string,
   init: RequestInit,
-  { authenticated = false }: RequestOptions = {}
+  { authenticated = false }: RequestOptions = {},
 ): Promise<T> {
   let res: Response;
   try {
     res = await authFetch(path, init);
   } catch {
-    throw new Error("Unable to reach the server. Please try again.");
+    throw new ApiRequestError(
+      0,
+      "Unable to reach the server. Please try again.",
+    );
   }
 
   let data: unknown = null;
@@ -124,12 +139,16 @@ export async function request<T>(
 
     // Only clear the app session when this 401 is about the *user JWT*, not
     // upstream providers (Bedrock, Jira reauth codes, etc.).
-    if (res.status === 401 && authenticated && isAppSessionUnauthorized(code, message)) {
+    if (
+      res.status === 401 &&
+      authenticated &&
+      isAppSessionUnauthorized(code, message)
+    ) {
       setAuthNotice(message);
       clearToken();
     }
 
-    throw new Error(message);
+    throw new ApiRequestError(res.status, message, code, data);
   }
 
   return data as T;
@@ -170,10 +189,18 @@ export function isAppSessionUnauthorized(
   if (/jira connection must be authorized again/i.test(message)) {
     return false;
   }
-  if (/clickup connection must be authorized again|clickup mcp rate limit/i.test(message)) {
+  if (
+    /clickup connection must be authorized again|clickup mcp rate limit/i.test(
+      message,
+    )
+  ) {
     return false;
   }
-  if (/notion (mcp|ai) (connection )?must be (re)?authorized|notion ai access expired/i.test(message)) {
+  if (
+    /notion (mcp|ai) (connection )?must be (re)?authorized|notion ai access expired/i.test(
+      message,
+    )
+  ) {
     return false;
   }
   // Default: authenticated-route 401 → treat as session loss (Nest JWT guard).
@@ -185,7 +212,7 @@ export async function fetchMe(): Promise<User> {
   const user = await request<User>(
     "/auth/me",
     { method: "GET" },
-    { authenticated: true }
+    { authenticated: true },
   );
   setUser(user);
   return user;
@@ -201,12 +228,12 @@ type DisconnectResponse = {
  * user so any card reading the store flips back to a disconnected state.
  */
 export async function disconnectIntegration(
-  id: string
+  id: string,
 ): Promise<DisconnectResponse> {
   const result = await request<DisconnectResponse>(
     `/integrations/${id}`,
     { method: "DELETE" },
-    { authenticated: true }
+    { authenticated: true },
   );
   await fetchMe();
   return result;
@@ -225,7 +252,7 @@ export async function startNotionOAuth(): Promise<void> {
   const { authorizationUrl } = await request<{ authorizationUrl: string }>(
     "/auth/notion",
     { method: "GET" },
-    { authenticated: true }
+    { authenticated: true },
   );
 
   window.location.href = authorizationUrl;
@@ -240,7 +267,7 @@ export async function startNotionMcpOAuth(): Promise<void> {
   const { authorizationUrl } = await request<{ authorizationUrl: string }>(
     "/auth/notion/mcp",
     { method: "GET" },
-    { authenticated: true }
+    { authenticated: true },
   );
 
   window.location.href = authorizationUrl;
@@ -248,8 +275,7 @@ export async function startNotionMcpOAuth(): Promise<void> {
 
 /** Reads the JWT out of a response, tolerating a few common field names. */
 function extractToken(data: Record<string, unknown>): string {
-  const token =
-    data.accessToken ?? data.token ?? data.access_token ?? data.jwt;
+  const token = data.accessToken ?? data.token ?? data.access_token ?? data.jwt;
   if (typeof token !== "string" || !token) {
     throw new Error("No token returned by the server.");
   }
@@ -267,7 +293,7 @@ function completeAuth(data: Record<string, unknown>): AuthResponse {
 
 export async function login(
   email: string,
-  password: string
+  password: string,
 ): Promise<AuthResponse> {
   const data = await postJson<Record<string, unknown>>("/auth/login", {
     email,
@@ -279,7 +305,7 @@ export async function login(
 export async function signup(
   name: string,
   email: string,
-  password: string
+  password: string,
 ): Promise<AuthResponse> {
   const data = await postJson<Record<string, unknown>>("/auth/signup", {
     name,

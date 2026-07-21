@@ -13,14 +13,11 @@ import {
 } from "./assistant-thread-store";
 
 /**
- * Shape returned by the Nest assistant endpoints.
- *
- * `POST /assistant/ask` and the unified `POST /assistant/brain` return every
- * field. The focused `POST /assistant/chat` endpoint returns only `answer`
- * (mapped from its `message`) and no tool trace, so provider/model/rounds are
- * optional here.
+ * Shape returned by POST /assistant/brain (unified multi-app tool loop).
+ * provider/model/rounds are optional for defensive parsing of partial payloads.
  */
 export interface BackendAssistantAskResponse {
+  kind?: "answer" | "no_connections" | "no_tools";
   answer: string;
   provider?: string;
   model?: string;
@@ -35,6 +32,7 @@ export interface BackendAssistantAskResponse {
   }>;
   promptTokens?: number;
   outputTokens?: number;
+  runId?: string;
 }
 
 /**
@@ -81,6 +79,7 @@ export function mergeAskIntoThread(
     model: backend.model,
     provider: backend.provider,
     availableConnections: backend.availableConnections,
+    runId: backend.runId,
   };
 
   thread.messages.push(userMessage, assistantMessage);

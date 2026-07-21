@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setUser, type User } from "@/lib/auth";
-import {
-  formatNestErrorBody,
-  mergeAskIntoThread,
-} from "./assistant-ask";
+import { formatNestErrorBody, mergeAskIntoThread } from "./assistant-ask";
 import { clearStoredThreads, getStoredThread } from "./assistant-thread-store";
 
 const testUser: User = {
@@ -44,7 +41,9 @@ describe("mergeAskIntoThread", () => {
     expect(answer.thread.title).toContain("open bugs");
     expect(answer.thread.messages).toHaveLength(2);
     expect(answer.thread.messages[0]?.role).toBe("user");
-    expect(answer.thread.messages[0]?.content).toBe("What open bugs do I have?");
+    expect(answer.thread.messages[0]?.content).toBe(
+      "What open bugs do I have?",
+    );
     expect(answer.message.role).toBe("assistant");
     expect(answer.message.content).toBe("You have 2 open bugs.");
     expect(answer.message.toolCalls).toEqual([
@@ -95,9 +94,7 @@ describe("formatNestErrorBody", () => {
   });
 
   it("joins array messages", () => {
-    expect(
-      formatNestErrorBody({ message: ["a", "b"] }, 400),
-    ).toBe("a b");
+    expect(formatNestErrorBody({ message: ["a", "b"] }, 400)).toBe("a b");
   });
 
   it("includes code when present", () => {
@@ -157,5 +154,55 @@ describe("httpWorkOsClient.askAssistant integration mapping", () => {
     expect(answer.message.toolCalls?.[0]?.name).toBe("jira_search");
     expect(answer.persisted).toBe(true);
     expect(answer.thread.messages).toHaveLength(2);
+  });
+
+  it("posts a server-enforced source filter without rewriting the prompt", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/auth", () => ({
+      disconnectIntegration: vi.fn(),
+      fetchMe: vi.fn(),
+      getUser: vi.fn().mockReturnValue(testUser),
+      startNotionOAuth: vi.fn(),
+      request: vi.fn().mockResolvedValue({
+        answer: "Focused on Jira.",
+        provider: "groq",
+        model: "test",
+        toolCalls: [],
+        rounds: 1,
+        availableConnections: [],
+      }),
+    }));
+    vi.doMock("@/lib/integrations", () => ({
+      connectJira: vi.fn(),
+      listIntegrations: vi.fn().mockResolvedValue([]),
+    }));
+
+    const { httpWorkOsClient } = await import("./http-client");
+    const { request } = await import("@/lib/auth");
+
+    await httpWorkOsClient.askAssistant({
+      prompt: "What is blocked?",
+      sources: ["jira"],
+    });
+
+    expect(request).toHaveBeenCalledWith(
+      "/assistant/brain",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          message: "What is blocked?",
+          sources: ["JIRA"],
+        }),
+      }),
+      { authenticated: true },
+    );
+    const body = JSON.parse(
+      (request as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1]
+        .body as string,
+    ) as { message: string; sources: string[] };
+    expect(body).toEqual({
+      message: "What is blocked?",
+      sources: ["JIRA"],
+    });
   });
 });
